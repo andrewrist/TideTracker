@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS readings (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
--- Migration: add tide_height_ft to an existing table (no-op if already present).
+-- Migration: add tide_height_ft to an existing table.
+-- Skip this statement if the column already exists.
 ALTER TABLE readings
-    ADD COLUMN IF NOT EXISTS tide_height_ft DOUBLE NULL
+    ADD COLUMN tide_height_ft DOUBLE NULL
     AFTER distance_mm;

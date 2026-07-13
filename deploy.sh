@@ -23,7 +23,7 @@ DEPLOY_DIR="/opt/pi-sensor-logger"     # where the service runs from
 VENV_DIR="$DEPLOY_DIR/venv"
 SERVICE_NAME="pi-sensor-logger"
 
-# Files inside the repo's outputs/ subdirectory to deploy
+# Files inside the repo's main directory to deploy
 DEPLOY_FILES=(
     main.py
     requirements.txt
@@ -69,8 +69,8 @@ fi
 # 3. Copy files
 info "Copying files to $DEPLOY_DIR …"
 for f in "${DEPLOY_FILES[@]}"; do
-    src="$REPO_DIR/outputs/$f"
-    [[ -f "$src" ]] || error "Expected file not found in repo: outputs/$f"
+    src="$REPO_DIR/$f"
+    [[ -f "$src" ]] || error "Expected file not found in repo: $f"
     cp "$src" "$DEPLOY_DIR/$f"
     info "  $f"
 done

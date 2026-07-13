@@ -234,19 +234,6 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.teardown_appcontext(close_db)
 
-    # Touch the DB once at startup so config problems surface in the Apache
-    # error log immediately rather than on the first request.
-    try:
-        init_db()
-    except mysql.connector.Error as exc:
-        log.error("MySQL init failed: %s", exc)
-        if getattr(exc, "errno", None) == errorcode.ER_ACCESS_DENIED_ERROR:
-            log.error("Check MYSQL_USER / MYSQL_PASSWORD and GRANTs.")
-        elif getattr(exc, "errno", None) == errorcode.ER_BAD_DB_ERROR:
-            log.error("Database %r does not exist; create it first.", MYSQL_DB)
-        # Re-raise so mod_wsgi shows it instead of silently serving 500s.
-        raise
-
     @app.route("/health")
     def health():
         return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}
