@@ -1,0 +1,32 @@
+[Unit]
+Description=Pi Sensor Logger (VL53L1X + BME280 + ENS160 -> HTTPS)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust User/Group if you installed under a different account.
+User=pi
+Group=pi
+
+WorkingDirectory=/opt/pi-sensor-logger
+Environment=CONFIG_PATH=/etc/pi-sensor-logger/config.yaml
+ExecStart=/opt/pi-sensor-logger/venv/bin/python /opt/pi-sensor-logger/main.py --config /etc/pi-sensor-logger/config.yaml
+
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=10
+StartLimitIntervalSec=300
+
+# Send stdout/stderr to the journal (view with: journalctl -u pi-sensor-logger -f)
+StandardOutput=journal
+StandardError=journal
+
+# Modest hardening — sensor access via I2C still works.
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

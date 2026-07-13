@@ -1,0 +1,84 @@
+# Pi Sensor Logger configuration
+# Copy this to /etc/pi-sensor-logger/config.yaml and edit for your environment.
+
+wifi:
+  # The OS (NetworkManager / wpa_supplicant) manages Wi-Fi.
+  # These fields are reference-only — the app reports the current SSID it finds
+  # via `iwgetid`. To actually configure Wi-Fi, use `sudo raspi-config`,
+  # `nmtui`, or write to /etc/wpa_supplicant/wpa_supplicant.conf.
+  expected_ssid: "bluesky"
+
+upload:
+  # Endpoint that will receive a JSON POST every interval.
+  url: "https://sensors.bigdatz.com/api/readings"
+
+  # Identifier for this device (included in every payload).
+  device_id: "pi-zero-01"
+
+  # HTTP timeout in seconds.
+  timeout_seconds: 10
+
+  # Authentication. Set type to one of: none, bearer, api_key, basic.
+  auth:
+    type: "bearer"
+    token: "kgbAMYqclzE33-vfBQ9u8KUcniaxQf4DaKH3ztubI1I"
+
+    # For api_key auth, instead use:
+    # type: "api_key"
+    # header_name: "X-API-Key"
+    # key: "REPLACE_WITH_YOUR_KEY"
+
+    # For basic auth:
+    # type: "basic"
+    # username: "user"
+    # password: "pass"
+
+  # Number of upload attempts per reading before giving up (with exponential backoff).
+  retries: 3
+
+measurement:
+  # Seconds between readings.
+  interval_seconds: 60
+
+  # Height of the distance sensor above the zero-tide reference point, in mm.
+  # Tide height (ft) = ((sensor_height_mm - distance_mm) / 25.4) / 12
+  sensor_height_mm: 3200
+
+sensors:
+  # Distance sensors are tried in priority order; the first to initialise successfully is used.
+
+  # 1. RCWL-1655 ultrasonic via GPIO (highest priority).
+  rcwl1655_gpio:
+    enabled: true
+    trig_pin: 23      # GPIO23, physical Pin 16
+    echo_pin: 24      # GPIO24, physical Pin 18
+    max_distance_m: 4.0
+
+  # 2. SparkFun Ultrasonic Distance Sensor - TCT40 (Qwiic) / HC-SR04 via I2C.
+  hcsr04:
+    enabled: true
+    # SparkFun Qwiic Ultrasonic default I2C address.
+    address: 0x2F
+
+  vl53l1x:
+    enabled: true
+    address: 0x29
+    # "short" (~1.3 m, less sensitive to ambient light) or "long" (~4 m).
+    distance_mode: "long"
+    # ranging timing budget in milliseconds (20, 33, 50, 100, 200, 500).
+    timing_budget_ms: 500
+
+  bme280:
+    enabled: true
+    # SparkFun Environmental Combo: BME280 is 0x77 by default.
+    address: 0x77
+
+  ens160:
+    enabled: true
+    # SparkFun Environmental Combo: ENS160 is 0x53 by default (0x52 if jumper closed).
+    address: 0x53
+
+logging:
+  level: "INFO"          # DEBUG, INFO, WARNING, ERROR
+  file: "/var/log/pi-sensor-logger.log"
+  rotate_keep_days: 30   # Number of daily log files to retain

@@ -1,0 +1,8 @@
+PyYAML>=6.0
+requests>=2.31
+adafruit-blinka>=8.20
+adafruit-circuitpython-vl53l1x>=1.1.6
+adafruit-circuitpython-bme280>=2.6.20
+adafruit-circuitpython-ens160>=1.0.4
+sparkfun-qwiic-ultrasonic>=0.0.2
+gpiozero>=2.0

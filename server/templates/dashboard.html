@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pi Sensor Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <style>
+    /* Palette lifted from bigdatz.com/tides.html ---------------------- */
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: #fff;
+      color: #333;
+      font: 14px/21px Georgia, "Times New Roman", serif;
+    }
+    a { color: #336699; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Headings and form controls use Arial like the source page. */
+    h1, h2, h3, h4, th, td, button, select, input, .ui {
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    /* ---- Site header (dark #222 strip) ------------------------------ */
+    #site-header {
+      background: #222;
+      color: #fff;
+      padding: 10px 20px;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    #site-header h1 {
+      margin: 0;
+      font-size: 19.6px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.2px;
+    }
+    #site-header .pill { color: #ddd; }
+
+    /* ---- Sub-bar (controls), light gray to echo #primary-nav -------- */
+    #controls {
+      background: #f5f5f5;
+      border-bottom: 1px solid #ddd;
+      padding: 7px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 12px;
+    }
+    #controls label { color: #555; margin-right: 2px; }
+
+    /* ---- Form controls --------------------------------------------- */
+    select, input {
+      font: 11.76px Arial, Helvetica, sans-serif;
+      color: #333;
+      background: #fff;
+      border: 1px solid #bbb;
+      border-radius: 0;
+      padding: 4px 7px;
+    }
+    select:focus, input:focus { outline: 1px solid #336699; }
+    button {
+      font: 11.2px Arial, Helvetica, sans-serif;
+      color: #fff;
+      background: #666;
+      border: 1px solid #444;
+      border-radius: 2px;
+      padding: 4px 12px;
+      cursor: pointer;
+    }
+    button:hover { background: #555; }
+
+    /* ---- Pills for connection / Wi-Fi / age ------------------------- */
+    .pill {
+      display: inline-block;
+      padding: 1px 8px;
+      font: 11px Arial, Helvetica, sans-serif;
+      border: 1px solid #bbb;
+      background: #f5f5f5;
+      color: #555;
+      border-radius: 2px;
+    }
+    .pill.ok   { color: #fff; background: #2b7a2b; border-color: #1d5a1d; }
+    .pill.warn { color: #fff; background: #c08020; border-color: #8a5b16; }
+    .pill.bad  { color: #fff; background: #993333; border-color: #6b2424; }
+    #site-header .pill { background: rgba(255,255,255,0.10); border-color: #555; color: #ddd; }
+
+    /* ---- Main wrapper (matches #wrapper) --------------------------- */
+    main {
+      padding: 20px 20px 50px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Section heads */
+    h2.section {
+      font-size: 14px;
+      font-weight: 700;
+      color: #111;
+      margin: 22px 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #ddd;
+    }
+    h2.section:first-of-type { margin-top: 4px; }
+
+    /* ---- Latest reading row ---------------------------------------- */
+    .latest {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      margin-bottom: 6px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 6px 10px 8px;
+    }
+    .card .label {
+      color: #777;
+      font: 11px Arial, Helvetica, sans-serif;
+      margin-bottom: 2px;
+    }
+    .card .value {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #111;
+    }
+    .card .unit {
+      font: 11px Arial, Helvetica, sans-serif;
+      color: #777;
+      margin-left: 3px;
+      font-weight: 400;
+    }
+    .card .value.small {
+      font-size: 13px;
+      font-weight: 400;
+      line-height: 1.35;
+    }
+
+    /* ---- Charts ---------------------------------------------------- */
+    .charts {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    }
+    .chart-card {
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 6px 10px 10px;
+    }
+    .chart-card h3 {
+      margin: 2px 0 4px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #111;
+    }
+    .chart-wrap { height: 200px; }
+
+    /* ---- Table (matches tides table) ------------------------------- */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font: 11.76px Arial, Helvetica, sans-serif;
+      background: #fff;
+    }
+    th {
+      background: #336699;     /* tides.html header blue */
+      color: #fff;
+      text-align: left;
+      font-weight: 400;
+      padding: 5px 12px;
+      border: 0;
+    }
+    td {
+      color: #333;
+      padding: 4px 12px;
+      border-bottom: 1px solid #eee;
+    }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tbody tr:nth-child(even) td { background: #fafafa; }
+    tr:last-child td { border-bottom: none; }
+
+    /* ---- Footer ---------------------------------------------------- */
+    .footer {
+      color: #777;
+      font: 11.48px Arial, Helvetica, sans-serif;
+      margin-top: 18px;
+      padding-top: 8px;
+      border-top: 1px solid #ddd;
+    }
+    .footer code {
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      padding: 1px 4px;
+      font-size: 11px;
+    }
+    .empty {
+      color: #777;
+      padding: 18px;
+      text-align: center;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top dark bar, mirroring tides.html's #site-header --------------- -->
+<div id="site-header">
+  <h1>
+    Pi Sensor Dashboard
+    <span id="conn-pill" class="pill">connecting…</span>
+  </h1>
+  <span id="last-updated" class="pill">—</span>
+</div>
+
+<!-- Light-gray controls bar, mirroring #primary-nav ----------------- -->
+<div id="controls">
+  <label for="device">Station:</label>
+  <select id="device"></select>
+  <label for="range">Range:</label>
+  <select id="range">
+    <option value="1">Last 1 h</option>
+    <option value="6">Last 6 h</option>
+    <option value="24" selected>Last 24 h</option>
+    <option value="168">Last 7 days</option>
+    <option value="720">Last 30 days</option>
+  </select>
+  <button id="refresh">Refresh</button>
+</div>
+
+<main>
+  <h2 class="section">Latest reading</h2>
+  <section class="latest" id="latest-cards"></section>
+
+  <h2 class="section">History</h2>
+  <section class="charts">
+    <div class="chart-card"><h3>Tide Height (ft)</h3>          <div class="chart-wrap"><canvas id="c-tide"></canvas></div></div>
+    <div class="chart-card"><h3>Distance (mm)</h3>             <div class="chart-wrap"><canvas id="c-distance"></canvas></div></div>
+    <div class="chart-card"><h3>Temperature (°F)</h3>          <div class="chart-wrap"><canvas id="c-temp"></canvas></div></div>
+    <div class="chart-card"><h3>Humidity (%RH)</h3>            <div class="chart-wrap"><canvas id="c-humidity"></canvas></div></div>
+    <div class="chart-card"><h3>Pressure (hPa)</h3>            <div class="chart-wrap"><canvas id="c-pressure"></canvas></div></div>
+    <div class="chart-card"><h3>Air-quality index</h3>         <div class="chart-wrap"><canvas id="c-aqi"></canvas></div></div>
+    <div class="chart-card"><h3>TVOC (ppb) &amp; eCO2 (ppm)</h3><div class="chart-wrap"><canvas id="c-gases"></canvas></div></div>
+  </section>
+
+  <h2 class="section">Recent readings</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Time (UTC)</th>
+        <th>Device</th>
+        <th class="num">Tide ft</th>
+        <th class="num">Dist mm</th>
+        <th class="num">Temp °F</th>
+        <th class="num">Humidity %</th>
+        <th class="num">Press hPa</th>
+        <th class="num">AQI</th>
+        <th class="num">TVOC ppb</th>
+        <th class="num">eCO2 ppm</th>
+        <th>Wi-Fi</th>
+      </tr>
+    </thead>
+    <tbody id="rows">
+      <tr><td colspan="11" class="empty">Loading…</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Auto-refreshes every 30&nbsp;s. Readings POSTed to <code>/api/readings</code>
+    with <code>Authorization: Bearer &lt;token&gt;</code>.
+  </div>
+</main>
+
+<script>
+(() => {
+  const $ = (sel) => document.querySelector(sel);
+  const fmt = (v, digits = 1) => (v === null || v === undefined || Number.isNaN(v)) ? "—" : Number(v).toFixed(digits);
+  const fmtInt = (v) => (v === null || v === undefined) ? "—" : Math.round(v).toString();
+
+  const METRIC_FIELDS = [
+    { key: "tide_height_ft", label: "Tide Height",   unit: "ft",  digits: 2 },
+    { key: "distance_mm",    label: "Distance",      unit: "mm",  digits: 1 },
+    { key: "temperature_f",  label: "Temperature",   unit: "°F",  digits: 1 },
+    { key: "humidity_pct",   label: "Humidity",      unit: "%",   digits: 1 },
+    { key: "pressure_hpa",   label: "Pressure",      unit: "hPa", digits: 1 },
+    { key: "aqi",            label: "AQI",           unit: "",    digits: 0 },
+    { key: "tvoc_ppb",       label: "TVOC",          unit: "ppb", digits: 0 },
+    { key: "eco2_ppm",       label: "eCO2",          unit: "ppm", digits: 0 },
+  ];
+
+  // Chart palette tuned for a white background, restrained colors
+  const AXIS = "#555";
+  const GRID = "rgba(0,0,0,0.07)";
+  const FONT_FAMILY = "Arial, Helvetica, sans-serif";
+  const charts = {};
+  function makeChart(id, datasets) {
+    const ctx = document.getElementById(id).getContext("2d");
+    return new Chart(ctx, {
+      type: "line",
+      data: { datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        parsing: false,
+        spanGaps: true,
+        plugins: {
+          legend: { display: datasets.length > 1, labels: { color: AXIS, font: { family: FONT_FAMILY, size: 11 } } },
+          tooltip: { mode: "index", intersect: false, titleFont: { family: FONT_FAMILY }, bodyFont: { family: FONT_FAMILY } }
+        },
+        scales: {
+          x: {
+            type: "time",
+            time: { tooltipFormat: "yyyy-MM-dd HH:mm" },
+            ticks: { color: AXIS, maxTicksLimit: 6, font: { family: FONT_FAMILY, size: 11 } },
+            grid:  { color: GRID }
+          },
+          y: {
+            ticks: { color: AXIS, font: { family: FONT_FAMILY, size: 11 } },
+            grid:  { color: GRID }
+          }
+        },
+        elements: { point: { radius: 0 }, line: { borderWidth: 1.5, tension: 0.25 } }
+      }
+    });
+  }
+
+  function ensureCharts() {
+    if (charts.initialised) return;
+    // Match the steel-blue table header as the dominant accent.
+    charts.tide     = makeChart("c-tide",     [{ label: "Tide Height", data: [], borderColor: "#1a6b8a", backgroundColor: "rgba(26,107,138,0.12)", fill: true }]);
+    charts.distance = makeChart("c-distance", [{ label: "Distance",    data: [], borderColor: "#336699", backgroundColor: "rgba(51,102,153,0.10)", fill: true }]);
+    charts.temp     = makeChart("c-temp",     [{ label: "Temperature", data: [], borderColor: "#993333", backgroundColor: "rgba(153,51,51,0.08)", fill: true }]);
+    charts.humidity = makeChart("c-humidity", [{ label: "Humidity",    data: [], borderColor: "#2b7a2b", backgroundColor: "rgba(43,122,43,0.08)", fill: true }]);
+    charts.pressure = makeChart("c-pressure", [{ label: "Pressure",    data: [], borderColor: "#553377", backgroundColor: "rgba(85,51,119,0.08)", fill: true }]);
+    charts.aqi      = makeChart("c-aqi",      [{ label: "AQI",         data: [], borderColor: "#c08020", backgroundColor: "rgba(192,128,32,0.10)", fill: true }]);
+    charts.gases    = makeChart("c-gases", [
+      { label: "TVOC (ppb)", data: [], borderColor: "#336699", yAxisID: "y"  },
+      { label: "eCO2 (ppm)", data: [], borderColor: "#c08020", yAxisID: "y1" }
+    ]);
+    charts.gases.options.scales.y1 = {
+      position: "right", grid: { drawOnChartArea: false }, ticks: { color: AXIS, font: { family: FONT_FAMILY, size: 11 } }
+    };
+    charts.initialised = true;
+  }
+
+  function setPill(el, text, cls) {
+    el.textContent = text;
+    el.classList.remove("ok","warn","bad");
+    if (cls) el.classList.add(cls);
+  }
+
+  async function loadDevices() {
+    const r = await fetch("/api/devices");
+    if (!r.ok) throw new Error("GET /api/devices " + r.status);
+    return await r.json();
+  }
+
+  async function loadReadings(deviceId, hours, limit) {
+    const sinceISO = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+    const u = new URL("/api/readings", location.origin);
+    if (deviceId) u.searchParams.set("device_id", deviceId);
+    u.searchParams.set("since", sinceISO);
+    u.searchParams.set("limit", String(limit));
+    const r = await fetch(u);
+    if (!r.ok) throw new Error("GET /api/readings " + r.status);
+    return await r.json();
+  }
+
+  function renderLatest(latest) {
+    const root = $("#latest-cards");
+    if (!latest) {
+      root.innerHTML = `<div class="card"><div class="label">No readings yet</div></div>`;
+      return;
+    }
+    const ts = latest.ts ? new Date(latest.ts) : null;
+    const ageMin = ts ? (Date.now() - ts.getTime()) / 60000 : null;
+    const ageCls = ageMin === null ? "" : (ageMin < 5 ? "ok" : ageMin < 30 ? "warn" : "bad");
+    const ageTxt = ageMin === null ? "—" : (ageMin < 1 ? "<1 min ago" : ageMin < 60 ? `${ageMin.toFixed(0)} min ago` : `${(ageMin/60).toFixed(1)} h ago`);
+
+    const cards = [];
+    cards.push(`<div class="card"><div class="label">Last reading</div><div class="value small">${ts ? ts.toISOString().replace("T"," ").slice(0,19) + " UTC" : "—"}<br><span class="pill ${ageCls}">${ageTxt}</span></div></div>`);
+
+    for (const m of METRIC_FIELDS) {
+      const v = latest[m.key];
+      cards.push(`<div class="card"><div class="label">${m.label}</div><div class="value">${fmt(v, m.digits)}<span class="unit">${m.unit}</span></div></div>`);
+    }
+    cards.push(`<div class="card"><div class="label">Wi-Fi</div><div class="value small">${latest.wifi_ssid || "—"}<br><span class="pill ${latest.wifi_connected ? "ok":"bad"}">${latest.wifi_connected ? "connected" : "offline"}</span></div></div>`);
+    root.innerHTML = cards.join("");
+  }
+
+  function renderTable(rows) {
+    const tbody = $("#rows");
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="11" class="empty">No readings in this window.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.slice(0, 100).map(r => `
+      <tr>
+        <td>${(r.ts || "").replace("T"," ").slice(0,19)}</td>
+        <td>${r.device_id ?? ""}</td>
+        <td class="num">${fmt(r.tide_height_ft, 2)}</td>
+        <td class="num">${fmt(r.distance_mm, 1)}</td>
+        <td class="num">${fmt(r.temperature_f, 1)}</td>
+        <td class="num">${fmt(r.humidity_pct, 1)}</td>
+        <td class="num">${fmt(r.pressure_hpa, 1)}</td>
+        <td class="num">${fmtInt(r.aqi)}</td>
+        <td class="num">${fmtInt(r.tvoc_ppb)}</td>
+        <td class="num">${fmtInt(r.eco2_ppm)}</td>
+        <td>${r.wifi_ssid ?? ""}${r.wifi_connected ? "" : " <span class='pill bad'>off</span>"}</td>
+      </tr>
+    `).join("");
+  }
+
+  function pushSeries(chart, points, datasetIdx = 0) {
+    chart.data.datasets[datasetIdx].data = points;
+    chart.update("none");
+  }
+
+  function buildSeries(rows, field) {
+    const pts = [];
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const v = rows[i][field];
+      if (v === null || v === undefined) continue;
+      pts.push({ x: new Date(rows[i].ts).valueOf(), y: Number(v) });
+    }
+    return pts;
+  }
+
+  async function refresh() {
+    try {
+      const deviceId = $("#device").value || null;
+      const hours = Number($("#range").value);
+      const rows = await loadReadings(deviceId, hours, 5000);
+      renderLatest(rows[0]);
+      renderTable(rows);
+      ensureCharts();
+      pushSeries(charts.tide,     buildSeries(rows, "tide_height_ft"));
+      pushSeries(charts.distance, buildSeries(rows, "distance_mm"));
+      pushSeries(charts.temp,     buildSeries(rows, "temperature_f"));
+      pushSeries(charts.humidity, buildSeries(rows, "humidity_pct"));
+      pushSeries(charts.pressure, buildSeries(rows, "pressure_hpa"));
+      pushSeries(charts.aqi,      buildSeries(rows, "aqi"));
+      pushSeries(charts.gases,    buildSeries(rows, "tvoc_ppb"), 0);
+      pushSeries(charts.gases,    buildSeries(rows, "eco2_ppm"), 1);
+      setPill($("#conn-pill"), `${rows.length} pts`, "ok");
+      setPill($("#last-updated"), "updated " + new Date().toLocaleTimeString(), null);
+    } catch (e) {
+      console.error(e);
+      setPill($("#conn-pill"), "error", "bad");
+    }
+  }
+
+  async function init() {
+    const devSel = $("#device");
+    try {
+      const devices = await loadDevices();
+      if (!devices.length) {
+        devSel.innerHTML = `<option value="">(no devices yet)</option>`;
+      } else {
+        devSel.innerHTML = devices.map(d =>
+          `<option value="${d.device_id}">${d.device_id}  (${d.reading_count} readings)</option>`
+        ).join("");
+      }
+    } catch (e) {
+      devSel.innerHTML = `<option value="">(error)</option>`;
+    }
+    devSel.addEventListener("change", refresh);
+    $("#range").addEventListener("change", refresh);
+    $("#refresh").addEventListener("click", refresh);
+    await refresh();
+    setInterval(refresh, 30_000);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
