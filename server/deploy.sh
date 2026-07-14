@@ -91,15 +91,15 @@ fi
 # 3. Copy files
 info "Copying files to $DEPLOY_DIR …"
 for f in "${DEPLOY_FILES[@]}"; do
-    src="$REPO_DIR/outputs/server/$f"
-    [[ -f "$src" ]] || error "Expected file not found in repo: outputs/server/$f"
+    src="$REPO_DIR/server/$f"
+    [[ -f "$src" ]] || error "Expected file not found in repo: server/$f"
     cp "$src" "$DEPLOY_DIR/$f"
     info "  $f"
 done
 
 # Copy templates directory
 info "  templates/"
-cp -r "$REPO_DIR/outputs/server/templates" "$DEPLOY_DIR/"
+cp -r "$REPO_DIR/server/templates" "$DEPLOY_DIR/"
 
 # 4. Apply schema migration
 if load_env "$ENV_FILE"; then
