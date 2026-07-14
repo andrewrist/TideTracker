@@ -157,8 +157,9 @@ def main() -> int:
     # ------------------------------------------------------------------ #
     # Sensor init
     # ------------------------------------------------------------------ #
+    history_window = int(meas_cfg.get("distance_history_window", 5))
     try:
-        bus = SensorBus()
+        bus = SensorBus(distance_history_window=history_window)
     except Exception as exc:  # noqa: BLE001
         log.error("Failed to open I2C bus: %s", exc)
         return 3

@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 class SensorBus:
     """Lazy-initialised wrapper around the sensors on the Qwiic bus."""
 
-    def __init__(self) -> None:
+    def __init__(self, distance_history_window: int = 5) -> None:
         # Import board/busio inside __init__ so importing this module on a
         # non-Pi machine (e.g. for syntax checks) doesn't blow up.
         import board
@@ -44,9 +44,9 @@ class SensorBus:
         self.ens = None       # type: ignore[assignment]
 
         # Rolling history for sigma-based outlier rejection.
-        # Only applied once _history_min accepted readings are on record.
-        self._distance_history: deque = deque(maxlen=20)
-        self._history_min = 5
+        # The test is only applied once the window is full.
+        self._distance_history: deque = deque(maxlen=distance_history_window)
+        self._history_min = distance_history_window
 
     # ------------------------------------------------------------------ #
     # Initialisation

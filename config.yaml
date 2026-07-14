@@ -44,6 +44,11 @@ measurement:
   # Tide height (ft) = ((sensor_height_mm - distance_mm) / 25.4) / 12
   sensor_height_mm: 3200
 
+  # Number of accepted distance readings to keep for sigma-based outlier
+  # rejection. The test is only applied once this many readings have been
+  # collected. Set to 0 or 1 to disable.
+  distance_history_window: 5
+
 sensors:
   # Distance sensors are tried in priority order; the first to initialise successfully is used.
 
