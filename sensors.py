@@ -157,17 +157,32 @@ class SensorBus:
     # ------------------------------------------------------------------ #
     # Reads
     # ------------------------------------------------------------------ #
-    def read_distance_mm(self, poll_timeout_s: float = 1.0) -> Optional[float]:
+    def read_distance_mm(self, poll_timeout_s: float = 1.0, samples: int = 3) -> Optional[float]:
         """Return distance in millimetres using whichever sensor initialised.
 
-        Prefers the RCWL-1655 ultrasonic sensor; falls back to VL53L1X ToF.
-        Returns None if neither sensor is available or a read fails.
+        Takes `samples` readings and returns the median value, discarding
+        outliers caused by noise or transient reflections.
+        Returns None if fewer than one valid reading is obtained.
         """
-        if self._rcwl_gpio is not None:
-            return self._read_rcwl1655_gpio_mm()
-        if self._hcsr04 is not None:
-            return self._read_hcsr04_mm()
-        return self._read_vl53l1x_mm(poll_timeout_s)
+        import time
+
+        readings = []
+        for _ in range(samples):
+            if self._rcwl_gpio is not None:
+                val = self._read_rcwl1655_gpio_mm()
+            elif self._hcsr04 is not None:
+                val = self._read_hcsr04_mm()
+            else:
+                val = self._read_vl53l1x_mm(poll_timeout_s)
+            if val is not None:
+                readings.append(val)
+            if _ < samples - 1:
+                time.sleep(0.05)
+
+        if not readings:
+            return None
+        readings.sort()
+        return readings[len(readings) // 2]
 
     def _read_rcwl1655_gpio_mm(self, retries: int = 5, retry_delay_s: float = 0.1) -> Optional[float]:
         """Read distance from the GPIO-connected RCWL-1655.

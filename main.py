@@ -225,7 +225,7 @@ def main() -> int:
         loop_start = time.monotonic()
         ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-        distance_mm = bus.read_distance_mm()
+        distance_mm = bus.read_distance_mm(samples=3)
         tide_height_ft = (
             round(((sensor_height_mm - distance_mm) / 25.4) / 12, 3)
             if distance_mm is not None
