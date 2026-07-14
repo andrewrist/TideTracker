@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NOAA Tide Chart</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 14px;
+    background: #ffffff;
+    color: #333;
+    line-height: 1.5;
+  }
+
+  /* ── bigair.net header ── */
+  #site-header {
+    background: #222;
+    padding: 10px 20px;
+    border-bottom: 3px solid #444;
+  }
+  #site-header a {
+    color: #fff;
+    font-size: 1.4em;
+    font-weight: bold;
+    text-decoration: none;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  #primary-nav {
+    background: #f5f5f5;
+    border-bottom: 1px solid #ddd;
+    padding: 7px 20px;
+  }
+  #primary-nav a {
+    color: #444;
+    text-decoration: none;
+    margin-right: 14px;
+    font-size: 0.85em;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  #primary-nav a:hover { color: #000; text-decoration: underline; }
+
+  /* ── Content ── */
+  #wrapper {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 20px 20px 50px;
+  }
+
+  .station-bar {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 3px;
+    flex-wrap: wrap;
+  }
+  h1 {
+    font-size: 1.4em;
+    color: #111;
+    font-family: Arial, Helvetica, sans-serif;
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .subtitle {
+    color: #777;
+    font-size: 0.82em;
+    margin-bottom: 16px;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  /* ── Controls ── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    background: #336699;
+    color: #fff;
+    border: 1px solid #2a5580;
+    padding: 5px 14px;
+    font-size: 0.88em;
+    cursor: pointer;
+    font-family: Arial, Helvetica, sans-serif;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .btn:hover { background: #2a5580; }
+  .btn.today-btn { background: #558833; border-color: #446622; }
+  .btn.today-btn:hover { background: #446622; }
+
+  .range-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .range-label {
+    font-size: 0.82em;
+    color: #555;
+    font-family: Arial, Helvetica, sans-serif;
+    white-space: nowrap;
+  }
+  /* datetime-local inputs */
+  input[type="datetime-local"] {
+    padding: 4px 7px;
+    font-size: 0.84em;
+    border: 1px solid #bbb;
+    color: #333;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #fff;
+  }
+  .range-sep { color: #888; font-family: Arial, sans-serif; font-size: 0.9em; }
+
+  .date-bar {
+    font-size: 0.88em;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #444;
+    margin-bottom: 8px;
+  }
+  .date-bar strong { color: #111; }
+
+  /* ── Chart ── */
+  .chart-wrap {
+    background: #f9fbfe;
+    border: 1px solid #ccd8e8;
+    padding: 14px 14px 10px;
+    position: relative;
+  }
+  #tideChart { cursor: grab; user-select: none; }
+  #tideChart.dragging { cursor: grabbing; }
+  .chart-title {
+    text-align: center;
+    font-size: 0.9em;
+    color: #444;
+    font-family: Arial, Helvetica, sans-serif;
+    margin-bottom: 6px;
+    font-weight: bold;
+  }
+  #loading-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(249,251,254,0.82);
+    z-index: 10;
+    align-items: center;
+    justify-content: center;
+    font-family: Arial, sans-serif;
+    font-size: 0.9em;
+    color: #555;
+  }
+  #loading-overlay.active { display: flex; }
+
+  .legend {
+    display: flex;
+    gap: 18px;
+    justify-content: center;
+    margin-top: 6px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 0.82em;
+    color: #444;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-swatch { width: 28px; height: 3px; border-radius: 2px; }
+
+  /* ── Hi/Lo table ── */
+  .hilo-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 0.84em;
+    border: 1px solid #ccd8e8;
+    border-top: none;
+  }
+  .hilo-table th {
+    background: #336699;
+    color: #fff;
+    padding: 5px 12px;
+    text-align: left;
+    font-weight: normal;
+  }
+  .hilo-table td {
+    padding: 4px 12px;
+    border-bottom: 1px solid #e0e8f0;
+    color: #333;
+  }
+  .hilo-table tr:last-child td { border-bottom: none; }
+  .hilo-table tr:nth-child(even) td { background: #f0f5fb; }
+  .type-high { color: #cc4400; font-weight: bold; }
+  .type-low  { color: #0055aa; font-weight: bold; }
+
+  .footer-note {
+    margin-top: 16px;
+    font-size: 0.78em;
+    color: #999;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  .footer-note a { color: #336699; }
+
+  .error-box {
+    background: #fff3f3;
+    border: 1px solid #f5c0c0;
+    color: #a00;
+    padding: 10px 14px;
+    font-family: Arial, sans-serif;
+    font-size: 0.88em;
+    margin-top: 8px;
+    display: none;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+</style>
+</head>
+<body>
+
+<div id="site-header">
+  <a href="https://www.bigair.net">bigair.net</a>
+</div>
+<div id="primary-nav">
+  <a href="http://home.bigair.net">Home</a>
+  <a href="https://www.bigair.net/">Weather</a>
+  <a href="https://www.bigair.net/weather/sail">sail</a>
+  <a href="https://www.bigair.net/weather/socal">socal</a>
+  <a href="https://www.bigair.net/weather/bay-currents">currents</a>
+  <a href="https://www.bigair.net/weather/cal-water">water</a>
+  <a href="https://www.bigair.net/weather/links">links</a>
+</div>
+
+<div id="wrapper">
+  <div class="station-bar">
+    <h1 id="pageTitle">Richmond Inner Harbor – Tide Chart</h1>
+  </div>
+  <p class="subtitle" id="pageSubtitle">
+    NOAA Station 9414863 &nbsp;·&nbsp; Datum: MLLW &nbsp;·&nbsp; Local Standard/Daylight Time
+  </p>
+
+  <div class="controls">
+    <button class="btn" id="prevDay">◀&nbsp;−24h</button>
+    <div class="range-wrap">
+      <span class="range-label">From:</span>
+      <input type="datetime-local" id="startPicker">
+      <span class="range-sep">→</span>
+      <span class="range-label">To:</span>
+      <input type="datetime-local" id="endPicker">
+    </div>
+    <button class="btn" id="nextDay">+24h&nbsp;▶</button>
+    <button class="btn today-btn" id="todayBtn">Today</button>
+  </div>
+
+  <div class="date-bar" id="dateBar">&nbsp;</div>
+
+  <div class="chart-wrap">
+    <div class="chart-title" id="chartTitle">Loading…</div>
+    <canvas id="tideChart" height="230"></canvas>
+    <div id="loading-overlay" class="active">Loading tide data…</div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#2060aa;"></div>
+      <span>Predicted</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#1a7a40;"></div>
+      <span>Observed</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#c07010;"></div>
+      <span>Sensor</span>
+    </div>
+  </div>
+
+  <table class="hilo-table">
+    <thead>
+      <tr><th>Date / Time</th><th>Height</th><th>Type</th></tr>
+    </thead>
+    <tbody id="hiloBody">
+      <tr><td colspan="3" style="color:#888;padding:6px 12px;">Loading…</td></tr>
+    </tbody>
+  </table>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <p class="footer-note">
+    Predictions &amp; observations from
+    <a href="https://tidesandcurrents.noaa.gov/" target="_blank">NOAA Tides &amp; Currents</a>
+    &nbsp;·&nbsp;
+    <a href="https://www.usharbors.com/harbor/california/richmond-inner-harbor-ca/tides/" target="_blank">USHarbors</a>
+  </p>
+</div>
+
+
+<script>
+'use strict';
+
+// ════════════════════════════════════════════════════════
+//  State
+// ════════════════════════════════════════════════════════
+let stationId   = '9414863';
+let stationName = 'Richmond Inner Harbor, CA';
+
+// Default: today 00:00 → today 23:59
+let startDate = (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
+let endDate   = (() => { const d = new Date(); d.setHours(23,59,0,0); return d; })();
+let tideChart = null;
+
+// ── Drag-pan cache ─────────────────────────────────────────────
+// Stores the full fetched dataset (±1-day buffer) so dragging is
+// instant and doesn't require a new network request every frame.
+let cachedPredAll   = [];   // [{x: ms, y: ft}, …]  full buffered range
+let cachedObsAll    = [];   // [{x: ms, y: ft}, …]  full buffered range
+let cachedSensorAll = [];   // [{x: ms, y: ft}, …]  sensor readings
+let cachedHilos     = [];   // raw NOAA hi/lo objects, full buffered range
+let cacheBeginMs    = 0;
+let cacheEndMs      = 0;
+
+// ── Drag state ─────────────────────────────────────────────────
+const drag = { active: false, startX: 0, startMin: 0, startMax: 0 };
+
+// ════════════════════════════════════════════════════════
+//  Date / time helpers
+// ════════════════════════════════════════════════════════
+const pad = n => String(n).padStart(2, '0');
+
+// YYYYMMDD HH:MM  — what NOAA accepts for sub-day ranges
+function toNoaaDateTime(d) {
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+// YYYYMMDD  — used for hi/lo fetches (always full-day aligned)
+function toNoaaDate(d) {
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+}
+// "2026-05-22T08:00" — value for datetime-local input
+function toDatetimeLocal(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+// Parse datetime-local string safely (avoids UTC-interpretation bug)
+function parseDatetimeLocal(s) {
+  if (!s) return null;
+  const [datePart, timePart = '00:00'] = s.split('T');
+  const [y, m, day] = datePart.split('-').map(Number);
+  const [h, mi]     = timePart.split(':').map(Number);
+  return new Date(y, m - 1, day, h, mi);
+}
+
+// Floor to start of day
+function dayStart(d) { const r = new Date(d); r.setHours(0,0,0,0); return r; }
+// Ceil to end of day
+function dayEnd(d)   { const r = new Date(d); r.setHours(23,59,0,0); return r; }
+
+function parseLocalTime(tStr) {
+  const [datePart, timePart] = tStr.split(' ');
+  const [y, mo, da] = datePart.split('-').map(Number);
+  const [h, mi]     = timePart.split(':').map(Number);
+  return new Date(y, mo - 1, da, h, mi);
+}
+
+function fmtDatetime(d) {
+  const date = d.toLocaleDateString('en-US',
+    { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+  const h = d.getHours(), mi = d.getMinutes();
+  if (h === 0 && mi === 0) return date;
+  return date + ', ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+}
+function formatRangeLabel(s, e) {
+  const sf = fmtDatetime(s), ef = fmtDatetime(e);
+  return sf + ' – ' + ef;
+}
+
+// ════════════════════════════════════════════════════════
+//  NOAA API
+// ════════════════════════════════════════════════════════
+// NOAA only reliably accepts plain YYYYMMDD dates.
+// Passing datetime strings (e.g. "20260522 00:00") causes a silent {} response.
+// We always fetch full days and slice to the user's time window client-side.
+async function fetchNoaa(beginDate, endDate, interval, product) {
+  let url = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter'
+    + `?begin_date=${beginDate}`
+    + `&end_date=${endDate}`
+    + `&station=${stationId}`
+    + `&product=${product}`
+    + `&datum=MLLW`
+    + `&time_zone=lst_ldt`
+    + `&units=english`
+    + `&format=json`;
+
+  if (interval) url += `&interval=${interval}`;
+
+  console.log('NOAA request:', url);
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`NOAA HTTP ${resp.status}`);
+
+  let json;
+  try { json = await resp.json(); }
+  catch (e) { throw new Error('NOAA returned non-JSON response'); }
+
+  console.log('NOAA response keys:', Object.keys(json).join(', ') || '(empty)');
+  if (json.error) throw new Error(`NOAA: ${json.error.message}`);
+  return json;
+}
+
+async function fetchStationMeta(id) {
+  const resp = await fetch(
+    `https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/${id}.json`
+  );
+  if (!resp.ok) throw new Error(`Station ${id} not found (HTTP ${resp.status})`);
+  const json = await resp.json();
+  if (!json.stations || !json.stations.length) throw new Error(`Station ${id} not found`);
+  return json.stations[0];
+}
+
+// ════════════════════════════════════════════════════════
+//  Chart helpers
+// ════════════════════════════════════════════════════════
+function tickStep(rangeMs) {
+  if (rangeMs <=  1.5 * 86400000) return  2 * 3600000;
+  if (rangeMs <=    4 * 86400000) return  6 * 3600000;
+  if (rangeMs <=    8 * 86400000) return 12 * 3600000;
+  return 24 * 3600000;
+}
+function formatTick(ms, rangeMs) {
+  const d = new Date(ms), h = d.getHours(), mi = d.getMinutes();
+  const multi = rangeMs > 86400000;
+
+  // Round to nearest tick to avoid floating-point label noise
+  if (mi > 2 && mi < 58) return '';
+
+  if (h === 0) {
+    return multi
+      ? d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })
+      : '12am';
+  }
+  if (h === 12) return multi
+    ? d.toLocaleDateString('en-US', { weekday:'short' }) + ' 12pm'
+    : '12pm';
+  if (multi && rangeMs > 2 * 86400000 && h % 6 !== 0) return '';
+  return h < 12 ? `${h}am` : `${h - 12}pm`;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+const annotationPlugin = {
+  id: 'tideAnnotations',
+  afterDraw(chart, _a, opts) {
+    const { ctx, chartArea, scales } = chart;
+    const { hilos, nowMs, rangeMs }  = opts;
+    ctx.save();
+
+    // Hi/Lo callouts — only when range ≤ 4 days
+    if (rangeMs <= 4 * 86400000) {
+      hilos.forEach(hl => {
+        const d  = parseLocalTime(hl.t);
+        const ms = d.getTime();
+        // skip if outside visible range
+        if (ms < scales.x.min || ms > scales.x.max) return;
+
+        const x      = scales.x.getPixelForValue(ms);
+        const y      = scales.y.getPixelForValue(parseFloat(hl.v));
+        const isHigh = hl.type === 'H';
+        const dot    = isHigh ? '#cc4400' : '#0055aa';
+
+        ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI*2);
+        ctx.fillStyle = dot; ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+
+        const timeStr = d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+        const htStr   = parseFloat(hl.v).toFixed(2) + "'";
+        const dayStr  = rangeMs > 86400000
+          ? d.toLocaleDateString('en-US', { weekday:'short' }) + ' ' : '';
+
+        const lineH = 13, boxW = 66, boxH = lineH*3+8, margin = 10;
+        const bx = Math.max(chartArea.left, Math.min(x - boxW/2, chartArea.right - boxW));
+        const by = isHigh ? y - boxH - margin : y + margin;
+
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.strokeStyle = dot; ctx.lineWidth = 1.2;
+        roundRect(ctx, bx, by, boxW, boxH, 3);
+        ctx.fill(); ctx.stroke();
+
+        const cx = bx + boxW / 2;
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 10px Arial'; ctx.fillStyle = dot;
+        ctx.fillText(isHigh ? 'High' : 'Low', cx, by + lineH);
+        ctx.font = '10px Arial'; ctx.fillStyle = '#222';
+        ctx.fillText(htStr, cx, by + lineH * 2);
+        ctx.font = '9px Arial'; ctx.fillStyle = '#666';
+        ctx.fillText(dayStr + timeStr, cx, by + lineH * 3 + 2);
+      });
+    }
+
+    // NOW line
+    if (nowMs >= scales.x.min && nowMs <= scales.x.max) {
+      const nx = scales.x.getPixelForValue(nowMs);
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = '#e63030'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(nx, chartArea.top); ctx.lineTo(nx, chartArea.bottom);
+      ctx.stroke(); ctx.setLineDash([]);
+      ctx.font = 'bold 9px Arial'; ctx.fillStyle = '#e63030';
+      ctx.textAlign = 'center';
+      ctx.fillText('NOW', nx, chartArea.top - 4);
+    }
+    ctx.restore();
+  }
+};
+
+// ════════════════════════════════════════════════════════
+//  Page header
+// ════════════════════════════════════════════════════════
+function updatePageHeader() {
+  document.getElementById('pageTitle').textContent     = `${stationName} – Tide Chart`;
+  document.getElementById('pageSubtitle').textContent  =
+    `NOAA Station ${stationId}  ·  Datum: MLLW  ·  Local Standard/Daylight Time`;
+  document.title = `Tide Chart – ${stationName}`;
+}
+
+// ════════════════════════════════════════════════════════
+//  Main render
+// ════════════════════════════════════════════════════════
+async function render() {
+  const overlay  = document.getElementById('loading-overlay');
+  const errorBox = document.getElementById('errorBox');
+  overlay.classList.add('active');
+  errorBox.style.display = 'none';
+
+  // Sync datetime-local inputs
+  document.getElementById('startPicker').value = toDatetimeLocal(startDate);
+  document.getElementById('endPicker').value   = toDatetimeLocal(endDate);
+
+  const rangeLabel = formatRangeLabel(startDate, endDate);
+  document.getElementById('dateBar').innerHTML =
+    `Showing: <strong>${rangeLabel}</strong>`;
+  document.getElementById('chartTitle').textContent =
+    `${stationName}  ·  ${rangeLabel}`;
+
+  // Fetch ±1-day buffer around the visible window so drag-panning is smooth
+  // without needing a network request on every frame.
+  const DAY = 86400000;
+  const bufStart = new Date(startDate.getTime() - DAY);
+  const bufEnd   = new Date(endDate.getTime()   + DAY);
+  const beginDay = toNoaaDate(dayStart(bufStart));
+  const endDay   = toNoaaDate(dayEnd(bufEnd));
+  cacheBeginMs = bufStart.getTime();
+  cacheEndMs   = bufEnd.getTime();
+
+  const now     = new Date();
+  const needObs = startDate <= now;
+
+  try {
+    const fetches = [
+      fetchNoaa(beginDay, endDay, null,   'predictions'),  // 6-min (default, no interval)
+      fetchNoaa(beginDay, endDay, 'hilo', 'predictions'),  // hi/lo
+    ];
+
+    if (needObs) {
+      // Observations only exist up to now; end day is today or earlier.
+      // Some stations don't publish water_level — catch that error silently
+      // so the chart still renders with predictions only.
+      const obsEndDay = endDate <= now ? endDay : toNoaaDate(now);
+      fetches.push(
+        fetchNoaa(beginDay, obsEndDay, null, 'water_level').catch(err => {
+          console.info('Observed water level not available for this station:', err.message);
+          return null;
+        })
+      );
+    } else {
+      fetches.push(Promise.resolve(null));
+    }
+
+    // Fetch sensor readings from our own API over the buffered window
+    fetches.push(
+      fetch(`/api/readings?since=${bufStart.toISOString()}&limit=5000`)
+        .then(r => r.ok ? r.json() : [])
+        .catch(() => [])
+    );
+
+    const [predJson, hiloJson, obsJson, sensorRows] = await Promise.all(fetches);
+
+    const allPreds = predJson.predictions || [];
+    const hilos    = hiloJson.predictions || [];
+    const obsRaw   = obsJson ? (obsJson.data || []) : [];
+
+    // Populate drag-pan cache from full buffered fetch
+    cachedPredAll = allPreds.map(p => ({
+      x: parseLocalTime(p.t).getTime(), y: parseFloat(p.v)
+    }));
+    cachedObsAll = obsRaw
+      .filter(o => o.v !== '' && o.v != null && !isNaN(parseFloat(o.v)))
+      .map(o => ({ x: parseLocalTime(o.t).getTime(), y: parseFloat(o.v) }));
+    cachedSensorAll = (sensorRows || [])
+      .filter(r => r.tide_height_ft != null)
+      .map(r => ({ x: new Date(r.ts).getTime(), y: parseFloat(r.tide_height_ft) }))
+      .reverse();  // API returns newest-first; chart needs chronological order
+    cachedHilos = hilos;
+
+    if (!allPreds.length) {
+      const keys = Object.keys(predJson).join(', ') || '(empty)';
+      throw new Error(
+        `No prediction data returned.\nNOAA response keys: ${keys}\n` +
+        `Station: ${stationId}, dates: ${beginDay} → ${endDay}`
+      );
+    }
+
+    // Slice to the user's selected time window
+    const nowMs  = now.getTime();
+    const xMin   = startDate.getTime();
+    const xMax   = endDate.getTime();
+
+    const predPoints = allPreds
+      .map(p => ({ x: parseLocalTime(p.t).getTime(), y: parseFloat(p.v) }))
+      .filter(pt => pt.x >= xMin && pt.x <= xMax);
+
+    const obsPoints = obsRaw
+      .filter(o => o.v !== '' && o.v != null && !isNaN(parseFloat(o.v)))
+      .map(o => ({ x: parseLocalTime(o.t).getTime(), y: parseFloat(o.v) }))
+      .filter(pt => pt.x >= xMin && pt.x <= nowMs);
+
+    const sensorPoints = cachedSensorAll.filter(pt => pt.x >= xMin && pt.x <= xMax);
+
+    const rangeMs = xMax - xMin;
+
+    const canvas = document.getElementById('tideChart');
+    const ctx    = canvas.getContext('2d');
+    const grad   = ctx.createLinearGradient(0, 0, 0, canvas.clientHeight || 230);
+    grad.addColorStop(0,    'rgba(50,120,200,0.52)');
+    grad.addColorStop(0.55, 'rgba(90,155,215,0.25)');
+    grad.addColorStop(1,    'rgba(140,195,235,0.05)');
+
+    if (tideChart) { tideChart.destroy(); tideChart = null; }
+
+    tideChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: [
+          {
+            label: 'Predicted',
+            data: predPoints,
+            borderColor: '#2060aa',
+            backgroundColor: grad,
+            fill: true, borderWidth: 2, pointRadius: 0, tension: 0.4, parsing: false
+          },
+          {
+            label: 'Observed',
+            data: obsPoints,
+            borderColor: '#1a7a40',
+            backgroundColor: 'transparent',
+            fill: false, borderWidth: 2.5, pointRadius: 0, tension: 0.3, parsing: false
+          },
+          {
+            label: 'Sensor',
+            data: sensorPoints,
+            borderColor: '#c07010',
+            backgroundColor: 'transparent',
+            fill: false, borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#c07010',
+            tension: 0.2, parsing: false
+          }
+        ]
+      },
+      options: {
+        animation: { duration: 350 },
+        responsive: true, maintainAspectRatio: true,
+        layout: { padding: { top: 20 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            mode: 'index', intersect: false,
+            callbacks: {
+              title(items) {
+                const d = new Date(items[0].parsed.x);
+                const multi = rangeMs > 86400000;
+                const dateStr = multi
+                  ? d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) + '  '
+                  : '';
+                return dateStr + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+              },
+              label(item) {
+                const tag = ['Predicted', 'Observed', 'Sensor'][item.datasetIndex] || '';
+                return `  ${tag}: ${item.parsed.y.toFixed(2)} ft`;
+              }
+            }
+          },
+          tideAnnotations: { hilos, nowMs, rangeMs }
+        },
+        scales: {
+          x: {
+            type: 'linear', min: xMin, max: xMax,
+            ticks: {
+              stepSize: tickStep(rangeMs),
+              callback(v) { return formatTick(v, rangeMs); },
+              font: { size: 10, family: 'Arial' }, color: '#666', maxRotation: 0
+            },
+            grid: { color: 'rgba(0,0,0,0.06)' }, border: { color: '#bbb' }
+          },
+          y: {
+            title: { display:true, text:"Height (ft)", font:{size:10,family:'Arial'}, color:'#666' },
+            ticks: { callback: v => `${v}'`, font:{size:10,family:'Arial'}, color:'#666' },
+            grid: { color: 'rgba(0,0,0,0.06)' }, border: { color: '#bbb' }
+          }
+        }
+      },
+      plugins: [annotationPlugin]
+    });
+
+    // Hi/Lo table — only show rows within the visible window
+    const tbody = document.getElementById('hiloBody');
+    tbody.innerHTML = '';
+    const multi = rangeMs > 86400000;
+    const visibleHilos = hilos.filter(hl => {
+      const t = parseLocalTime(hl.t).getTime();
+      return t >= xMin && t <= xMax;
+    });
+
+    if (visibleHilos.length) {
+      visibleHilos.forEach(hl => {
+        const d = parseLocalTime(hl.t);
+        const isHigh = hl.type === 'H';
+        const dateStr = multi
+          ? d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) + '  '
+          : '';
+        const timeStr = d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${dateStr}${timeStr}</td>
+          <td>${parseFloat(hl.v).toFixed(2)} ft</td>
+          <td class="${isHigh ? 'type-high' : 'type-low'}">${isHigh ? '▲ High' : '▼ Low'}</td>`;
+        tbody.appendChild(tr);
+      });
+    } else {
+      tbody.innerHTML = '<tr><td colspan="3" style="color:#888;padding:4px 12px;">No hi/lo data in this window</td></tr>';
+    }
+
+  } catch (err) {
+    console.error('Tide chart error:', err);
+    if (tideChart) { tideChart.destroy(); tideChart = null; }
+    document.getElementById('chartTitle').textContent = 'Error loading tide data';
+    document.getElementById('hiloBody').innerHTML = '<tr><td colspan="3" style="color:#a00">–</td></tr>';
+    errorBox.textContent = err.message;
+    errorBox.style.display = 'block';
+  } finally {
+    overlay.classList.remove('active');
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  Controls wiring
+// ════════════════════════════════════════════════════════
+document.getElementById('prevDay').addEventListener('click', () => {
+  const ms = 24 * 3600000;
+  startDate = new Date(startDate.getTime() - ms);
+  endDate   = new Date(endDate.getTime()   - ms);
+  render();
+});
+document.getElementById('nextDay').addEventListener('click', () => {
+  const ms = 24 * 3600000;
+  startDate = new Date(startDate.getTime() + ms);
+  endDate   = new Date(endDate.getTime()   + ms);
+  render();
+});
+document.getElementById('todayBtn').addEventListener('click', () => {
+  startDate = new Date(); startDate.setHours(0,0,0,0);
+  endDate   = new Date(); endDate.setHours(23,59,0,0);
+  render();
+});
+document.getElementById('startPicker').addEventListener('change', e => {
+  const d = parseDatetimeLocal(e.target.value);
+  if (!d) return;
+  startDate = d;
+  if (endDate < startDate) endDate = new Date(startDate.getTime() + 3600000);
+  render();
+});
+document.getElementById('endPicker').addEventListener('change', e => {
+  const d = parseDatetimeLocal(e.target.value);
+  if (!d) return;
+  endDate = d;
+  if (startDate > endDate) startDate = new Date(endDate.getTime() - 3600000);
+  render();
+});
+
+
+// ════════════════════════════════════════════════════════
+//  Drag-to-pan
+// ════════════════════════════════════════════════════════
+function initDrag() {
+  const canvas = document.getElementById('tideChart');
+
+  // Normalise mouse and touch events to a single {clientX} shape
+  const clientX = e => (e.touches ? e.touches[0].clientX : e.clientX);
+
+  function onDragStart(e) {
+    if (!tideChart) return;
+    // Only start drag inside the chart plot area
+    const rect   = canvas.getBoundingClientRect();
+    const relX   = clientX(e) - rect.left;
+    const { chartArea } = tideChart;
+    if (relX < chartArea.left || relX > chartArea.right) return;
+
+    drag.active   = true;
+    drag.startX   = clientX(e);
+    drag.startMin = tideChart.options.scales.x.min;
+    drag.startMax = tideChart.options.scales.x.max;
+    canvas.classList.add('dragging');
+    e.preventDefault();
+  }
+
+  function onDragMove(e) {
+    if (!drag.active || !tideChart) return;
+    e.preventDefault();
+
+    const { chartArea, scales } = tideChart;
+    const chartWidthPx = chartArea.right - chartArea.left;
+    const rangeMs      = drag.startMax - drag.startMin;
+    // Pixels moved → milliseconds shifted (drag right = view moves to earlier time)
+    const msDelta = ((clientX(e) - drag.startX) / chartWidthPx) * rangeMs;
+
+    const newMin = drag.startMin - msDelta;
+    const newMax = drag.startMax - msDelta;
+
+    // Update chart x-axis immediately — no network call
+    tideChart.options.scales.x.min = newMin;
+    tideChart.options.scales.x.max = newMax;
+
+    // Slice the cached dataset to the new window
+    tideChart.data.datasets[0].data = cachedPredAll.filter(
+      pt => pt.x >= newMin && pt.x <= newMax
+    );
+    tideChart.data.datasets[1].data = cachedObsAll.filter(
+      pt => pt.x >= newMin && pt.x <= newMax
+    );
+    tideChart.data.datasets[2].data = cachedSensorAll.filter(
+      pt => pt.x >= newMin && pt.x <= newMax
+    );
+
+    // Update annotation options so hi/lo callouts and NOW line track correctly
+    tideChart.options.plugins.tideAnnotations.hilos   = cachedHilos;
+    tideChart.options.plugins.tideAnnotations.nowMs   = Date.now();
+    tideChart.options.plugins.tideAnnotations.rangeMs = rangeMs;
+
+    tideChart.update('none');   // instant redraw, no animation
+  }
+
+  function onDragEnd(e) {
+    if (!drag.active) return;
+    drag.active = false;
+    canvas.classList.remove('dragging');
+
+    if (!tideChart) return;
+
+    // Commit the new window to state
+    const newMin = tideChart.options.scales.x.min;
+    const newMax = tideChart.options.scales.x.max;
+    startDate = new Date(newMin);
+    endDate   = new Date(newMax);
+
+    // Update pickers + date bar immediately
+    document.getElementById('startPicker').value = toDatetimeLocal(startDate);
+    document.getElementById('endPicker').value   = toDatetimeLocal(endDate);
+    document.getElementById('dateBar').innerHTML =
+      `Showing: <strong>${formatRangeLabel(startDate, endDate)}</strong>`;
+
+    // Re-fetch only when panned outside the cached buffer
+    if (newMin < cacheBeginMs || newMax > cacheEndMs) {
+      render();
+    }
+  }
+
+  // Mouse
+  canvas.addEventListener('mousedown',  onDragStart);
+  window.addEventListener('mousemove',  onDragMove);
+  window.addEventListener('mouseup',    onDragEnd);
+
+  // Touch
+  canvas.addEventListener('touchstart', onDragStart, { passive: false });
+  window.addEventListener('touchmove',  onDragMove,  { passive: false });
+  window.addEventListener('touchend',   onDragEnd);
+}
+
+// ════════════════════════════════════════════════════════
+//  Boot
+// ════════════════════════════════════════════════════════
+updatePageHeader();
+initDrag();
+render();
+</script>
+</body>
+</html>

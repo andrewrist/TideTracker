@@ -369,6 +369,11 @@ def create_app() -> Flask:
     def dashboard():
         return render_template("dashboard.html")
 
+    @app.get("/tides")
+    @require_dashboard_auth
+    def tides():
+        return render_template("pelicantides.html")
+
     @app.errorhandler(400)
     @app.errorhandler(401)
     @app.errorhandler(404)
