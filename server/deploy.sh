@@ -29,7 +29,6 @@ REPO_DIR="/opt/pi-sensor-server-src"   # local clone location
 DEPLOY_DIR="/opt/pi-sensor-server"     # where the WSGI app runs from
 VENV_DIR="$DEPLOY_DIR/venv"
 ENV_FILE="/etc/pi-sensor-server/env"   # MySQL credentials (KEY=value lines)
-APACHE_SERVICE="apache2"
 
 # Files inside the repo's outputs/server/ subdirectory to deploy
 DEPLOY_FILES=(
@@ -129,19 +128,13 @@ else
     info "         Run server/install.sh to create the venv, then re-run this script."
 fi
 
-# 6. Reload Apache
-if command -v systemctl &>/dev/null && systemctl list-unit-files "$APACHE_SERVICE.service" &>/dev/null 2>&1; then
-    info "Reloading $APACHE_SERVICE …"
-    systemctl reload "$APACHE_SERVICE"
-    sleep 1
-    STATUS=$(systemctl is-active "$APACHE_SERVICE" 2>/dev/null || true)
-    if [[ "$STATUS" == "active" ]]; then
-        info "Apache is running."
-    else
-        info "WARNING: Apache may not be running. Check with: systemctl status $APACHE_SERVICE"
-    fi
+# 6. Restart Apache
+if command -v apachectl &>/dev/null; then
+    info "Restarting Apache …"
+    apachectl restart
+    info "Apache restarted."
 else
-    info "Apache not found via systemctl — skipping reload."
+    info "apachectl not found — skipping restart."
 fi
 
 info "Deploy complete."
