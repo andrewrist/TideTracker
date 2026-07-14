@@ -70,7 +70,8 @@ API_TOKENS = {
     for t in os.environ.get("API_TOKENS", "").split(",")
     if t.strip()
 }
-DASHBOARD_PASSWORD = os.environ.get("DASHBOARD_PASSWORD", "").strip()
+DASHBOARD_PASSWORD   = os.environ.get("DASHBOARD_PASSWORD", "").strip()
+TIDE_THRESHOLD_FT    = float(os.environ.get("TIDE_THRESHOLD_FT", "0.9"))
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
@@ -367,12 +368,12 @@ def create_app() -> Flask:
     @app.get("/")
     @require_dashboard_auth
     def dashboard():
-        return render_template("dashboard.html")
+        return render_template("dashboard.html", tide_threshold_ft=TIDE_THRESHOLD_FT)
 
     @app.get("/tides")
     @require_dashboard_auth
     def tides():
-        return render_template("pelicantides.html")
+        return render_template("pelicantides.html", tide_threshold_ft=TIDE_THRESHOLD_FT)
 
     @app.errorhandler(400)
     @app.errorhandler(401)

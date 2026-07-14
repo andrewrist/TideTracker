@@ -502,8 +502,8 @@ const annotationPlugin = {
       });
     }
 
-    // 1.3 ft threshold line
-    const thresholdFt = 1.3;
+    // threshold line from server config
+    const thresholdFt = {{ tide_threshold_ft }};
     const ty = scales.y.getPixelForValue(thresholdFt);
     if (ty >= chartArea.top && ty <= chartArea.bottom) {
       ctx.setLineDash([6, 4]);
