@@ -936,10 +936,34 @@ function initDrag() {
 // ════════════════════════════════════════════════════════
 //  Boot
 // ════════════════════════════════════════════════════════
+async function refreshSensor() {
+  if (!tideChart) return;
+  try {
+    const xMin = tideChart.options.scales.x.min;
+    const xMax = tideChart.options.scales.x.max;
+    const since = new Date(Math.min(xMin, cacheBeginMs)).toISOString();
+    const rows = await fetch(`/api/readings?since=${since}&limit=5000`)
+      .then(r => r.ok ? r.json() : [])
+      .catch(() => []);
+
+    cachedSensorAll = (rows || [])
+      .filter(r => r.tide_height_ft != null)
+      .map(r => ({ x: new Date(r.ts).getTime(), y: parseFloat(r.tide_height_ft) }))
+      .reverse();
+
+    tideChart.data.datasets[2].data = cachedSensorAll.filter(
+      pt => pt.x >= xMin && pt.x <= xMax
+    );
+    tideChart.update('none');
+  } catch (e) {
+    console.warn('Sensor refresh failed:', e);
+  }
+}
+
 updatePageHeader();
 initDrag();
 render();
-setInterval(render, 60_000);
+setInterval(refreshSensor, 60_000);
 </script>
 </body>
 </html>
