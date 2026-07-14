@@ -19,6 +19,8 @@ the HC-SR04 Qwiic sensor, and gpiozero for the GPIO-connected RCWL-1655.
 from __future__ import annotations
 
 import logging
+import math
+from collections import deque
 from typing import Any, Dict, Optional
 
 log = logging.getLogger(__name__)
@@ -40,6 +42,11 @@ class SensorBus:
         self.distance = None    # VL53L1X ToF (fallback)  # type: ignore[assignment]
         self.bme = None       # type: ignore[assignment]
         self.ens = None       # type: ignore[assignment]
+
+        # Rolling history for sigma-based outlier rejection.
+        # Only applied once _history_min accepted readings are on record.
+        self._distance_history: deque = deque(maxlen=20)
+        self._history_min = 5
 
     # ------------------------------------------------------------------ #
     # Initialisation
@@ -157,6 +164,29 @@ class SensorBus:
     # ------------------------------------------------------------------ #
     # Reads
     # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------ #
+    # Outlier rejection
+    # ------------------------------------------------------------------ #
+    def _sigma_check(self, value: float) -> bool:
+        """Return True if value is within 1 sigma of the rolling history.
+
+        Returns True unconditionally when fewer than _history_min readings
+        have been accepted (not enough data to establish a baseline).
+        """
+        if len(self._distance_history) < self._history_min:
+            return True
+        n = len(self._distance_history)
+        mean = sum(self._distance_history) / n
+        variance = sum((x - mean) ** 2 for x in self._distance_history) / n
+        sigma = math.sqrt(variance)
+        if sigma == 0.0:
+            # All history identical — accept only exact matches
+            return value == mean
+        return abs(value - mean) <= sigma
+
+    # ------------------------------------------------------------------ #
+    # Reads
+    # ------------------------------------------------------------------ #
     def read_distance_mm(self, poll_timeout_s: float = 1.0, samples: int = 3) -> Optional[float]:
         """Return distance in millimetres using whichever sensor initialised.
 
@@ -182,7 +212,20 @@ class SensorBus:
         if not readings:
             return None
         readings.sort()
-        return readings[len(readings) // 2]
+        median = readings[len(readings) // 2]
+
+        if not self._sigma_check(median):
+            n = len(self._distance_history)
+            mean = sum(self._distance_history) / n
+            sigma = math.sqrt(sum((x - mean) ** 2 for x in self._distance_history) / n)
+            log.warning(
+                "Distance reading %.1f mm rejected (mean=%.1f, sigma=%.1f, |delta|=%.1f > 1σ)",
+                median, mean, sigma, abs(median - mean),
+            )
+            return None
+
+        self._distance_history.append(median)
+        return median
 
     def _read_rcwl1655_gpio_mm(self, retries: int = 5, retry_delay_s: float = 0.1) -> Optional[float]:
         """Read distance from the GPIO-connected RCWL-1655.

@@ -502,6 +502,19 @@ const annotationPlugin = {
       });
     }
 
+    // 1.3 ft threshold line
+    const thresholdFt = 1.3;
+    const ty = scales.y.getPixelForValue(thresholdFt);
+    if (ty >= chartArea.top && ty <= chartArea.bottom) {
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = '#cc3333'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(chartArea.left, ty); ctx.lineTo(chartArea.right, ty);
+      ctx.stroke(); ctx.setLineDash([]);
+      ctx.font = 'bold 9px Arial'; ctx.fillStyle = '#cc3333';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${thresholdFt}'`, chartArea.right - 4, ty - 4);
+    }
+
     // NOW line
     if (nowMs >= scales.x.min && nowMs <= scales.x.max) {
       const nx = scales.x.getPixelForValue(nowMs);

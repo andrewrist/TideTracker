@@ -233,6 +233,7 @@
     <option value="720">Last 30 days</option>
   </select>
   <button id="refresh">Refresh</button>
+  <a href="/tides" style="margin-left:8px;font:11.76px Arial,Helvetica,sans-serif;color:#336699;">Tide Charts ›</a>
 </div>
 
 <main>
@@ -332,10 +333,32 @@
     });
   }
 
+  const thresholdPlugin = {
+    id: "thresholdLine",
+    afterDraw(chart, _args, opts) {
+      const { ctx, chartArea, scales } = chart;
+      if (opts.value == null || !scales.y) return;
+      const y = scales.y.getPixelForValue(opts.value);
+      if (y < chartArea.top || y > chartArea.bottom) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = opts.color || "#cc3333";
+      ctx.lineWidth = opts.width || 1.5;
+      ctx.moveTo(chartArea.left, y);
+      ctx.lineTo(chartArea.right, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  };
+
   function ensureCharts() {
     if (charts.initialised) return;
     // Match the steel-blue table header as the dominant accent.
     charts.tide     = makeChart("c-tide",     [{ label: "Tide Height", data: [], borderColor: "#1a6b8a", backgroundColor: "rgba(26,107,138,0.12)", fill: true }]);
+    charts.tide.options.plugins.thresholdLine = { value: 1.3, color: "#cc3333", width: 1.5 };
+    Chart.register(thresholdPlugin);
     charts.distance = makeChart("c-distance", [{ label: "Distance",    data: [], borderColor: "#336699", backgroundColor: "rgba(51,102,153,0.10)", fill: true }]);
     charts.temp     = makeChart("c-temp",     [{ label: "Temperature", data: [], borderColor: "#993333", backgroundColor: "rgba(153,51,51,0.08)", fill: true }]);
     charts.humidity = makeChart("c-humidity", [{ label: "Humidity",    data: [], borderColor: "#2b7a2b", backgroundColor: "rgba(43,122,43,0.08)", fill: true }]);
