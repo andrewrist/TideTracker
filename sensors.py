@@ -19,7 +19,6 @@ the HC-SR04 Qwiic sensor, and gpiozero for the GPIO-connected RCWL-1655.
 from __future__ import annotations
 
 import logging
-import math
 from collections import deque
 from typing import Any, Dict, Optional
 
@@ -168,21 +167,17 @@ class SensorBus:
     # Outlier rejection
     # ------------------------------------------------------------------ #
     def _sigma_check(self, value: float) -> bool:
-        """Return True if value is within 1 sigma of the rolling history.
+        """Return True if value is within 5% of the mean of the rolling history.
 
         Returns True unconditionally when fewer than _history_min readings
         have been accepted (not enough data to establish a baseline).
         """
         if len(self._distance_history) < self._history_min:
             return True
-        n = len(self._distance_history)
-        mean = sum(self._distance_history) / n
-        variance = sum((x - mean) ** 2 for x in self._distance_history) / n
-        sigma = math.sqrt(variance)
-        if sigma == 0.0:
-            # All history identical — accept only exact matches
-            return value == mean
-        return abs(value - mean) <= sigma
+        mean = sum(self._distance_history) / len(self._distance_history)
+        if mean == 0.0:
+            return value == 0.0
+        return abs(value - mean) / mean <= 0.05
 
     # ------------------------------------------------------------------ #
     # Reads
@@ -215,12 +210,10 @@ class SensorBus:
         median = readings[len(readings) // 2]
 
         if not self._sigma_check(median):
-            n = len(self._distance_history)
-            mean = sum(self._distance_history) / n
-            sigma = math.sqrt(sum((x - mean) ** 2 for x in self._distance_history) / n)
+            mean = sum(self._distance_history) / len(self._distance_history)
             log.warning(
-                "Distance reading %.1f mm rejected (mean=%.1f, sigma=%.1f, |delta|=%.1f > 1σ)",
-                median, mean, sigma, abs(median - mean),
+                "Distance reading %.1f mm rejected (mean=%.1f, diff=%.1f%%  > 5%%)",
+                median, mean, abs(median - mean) / mean * 100,
             )
             return None
 
