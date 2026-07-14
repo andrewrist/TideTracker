@@ -460,6 +460,39 @@ const annotationPlugin = {
     const { hilos, nowMs, rangeMs }  = opts;
     ctx.save();
 
+    // Midnight dividers
+    {
+      const msMin = scales.x.min;
+      const msMax = scales.x.max;
+      // Find the first midnight strictly after msMin
+      const d = new Date(msMin);
+      d.setHours(0, 0, 0, 0);
+      if (d.getTime() <= msMin) d.setDate(d.getDate() + 1);
+
+      while (d.getTime() <= msMax) {
+        const x = scales.x.getPixelForValue(d.getTime());
+        if (x >= chartArea.left && x <= chartArea.right) {
+          // Vertical line
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x, chartArea.top);
+          ctx.lineTo(x, chartArea.bottom);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Date label on bottom axis
+          const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+          ctx.font = 'bold 9px Arial';
+          ctx.fillStyle = '#555';
+          ctx.textAlign = 'center';
+          ctx.fillText(label, x, chartArea.bottom + 16);
+        }
+        d.setDate(d.getDate() + 1);
+      }
+    }
+
     // Hi/Lo callouts — only when range ≤ 4 days
     if (rangeMs <= 4 * 86400000) {
       hilos.forEach(hl => {
