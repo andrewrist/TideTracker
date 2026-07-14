@@ -42,7 +42,7 @@ measurement:
 
   # Height of the distance sensor above the zero-tide reference point, in mm.
   # Tide height (ft) = ((sensor_height_mm - distance_mm) / 25.4) / 12
-  sensor_height_mm: 3200
+  sensor_height_mm: 3255
 
   # Number of accepted distance readings to keep for sigma-based outlier
   # rejection. The test is only applied once this many readings have been
