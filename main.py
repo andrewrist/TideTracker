@@ -238,6 +238,8 @@ def main() -> int:
             hum_pct=bme.get("humidity_pct"),
         )
         wifi = wifi_status()
+        if wifi.get("ssid") and wifi.get("ip"):
+            wifi["ssid"] = f"{wifi['ssid']} ({wifi['ip']})"
 
         payload: Dict[str, Any] = {
             "device_id": device_id,
