@@ -437,7 +437,7 @@
         <td class="num">${fmtInt(r.aqi)}</td>
         <td class="num">${fmtInt(r.tvoc_ppb)}</td>
         <td class="num">${fmtInt(r.eco2_ppm)}</td>
-        <td>${r.wifi_ssid ?? ""}${r.wifi_connected ? "" : " <span class='pill bad'>off</span>"}</td>
+        <td>${r.wifi_ssid ?? ""} ${r.wifi_ip ?? ""}</td>
       </tr>
     `).join("");
   }
