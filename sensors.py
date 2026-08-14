@@ -36,8 +36,9 @@ class SensorBus:
 
         self._board = board
         self.i2c = busio.I2C(board.SCL, board.SDA)
-        self._rcwl_gpio = None  # RCWL-1655 via GPIO (highest priority)
-        self._hcsr04 = None     # HC-SR04 Qwiic via I2C
+        self._rcwl_gpio = None       # RCWL-1655 via GPIO (highest priority)
+        self._rcwl_gpio_pins: dict = {}  # stored for reinit after DistanceSensorNoEcho
+        self._hcsr04 = None          # HC-SR04 Qwiic via I2C
         self.distance = None    # VL53L1X ToF (fallback)  # type: ignore[assignment]
         self.bme = None       # type: ignore[assignment]
         self.ens = None       # type: ignore[assignment]
@@ -71,6 +72,11 @@ class SensorBus:
                 max_distance=max_distance_m,
             )
             self._rcwl_gpio = sensor
+            self._rcwl_gpio_pins = {
+                "trig_pin": trig_pin,
+                "echo_pin": echo_pin,
+                "max_distance_m": max_distance_m,
+            }
             log.info(
                 "RCWL-1655 GPIO ready (TRIG=GPIO%d, ECHO=GPIO%d, max=%.1fm)",
                 trig_pin,
@@ -220,13 +226,31 @@ class SensorBus:
         self._distance_history.append(median)
         return median
 
+    def _reinit_rcwl1655_gpio(self) -> bool:
+        """Close and recreate the gpiozero DistanceSensor to recover from DistanceSensorNoEcho."""
+        try:
+            if self._rcwl_gpio is not None:
+                self._rcwl_gpio.close()
+        except Exception:  # noqa: BLE001
+            pass
+        self._rcwl_gpio = None
+        if not self._rcwl_gpio_pins:
+            return False
+        return self.init_rcwl1655_gpio(**self._rcwl_gpio_pins)
+
     def _read_rcwl1655_gpio_mm(self, retries: int = 5, retry_delay_s: float = 0.1) -> Optional[float]:
         """Read distance from the GPIO-connected RCWL-1655.
 
         gpiozero's DistanceSensor.distance returns metres (0.0 on missed echo).
-        Retries up to `retries` times if 0 is returned.
+        On a DistanceSensorNoEcho the sensor object is closed and recreated before
+        retrying, which is the reliable recovery path for that error.
         """
         import time
+
+        try:
+            from gpiozero import DistanceSensorNoEcho
+        except ImportError:
+            DistanceSensorNoEcho = Exception  # fallback if gpiozero not available
 
         for attempt in range(1, retries + 1):
             try:
@@ -235,6 +259,14 @@ class SensorBus:
                     log.debug("RCWL-1655 GPIO attempt %d/%d: missed echo", attempt, retries)
                 else:
                     return round(m * 1000.0, 1)
+            except DistanceSensorNoEcho:
+                log.warning(
+                    "RCWL-1655 GPIO attempt %d/%d: DistanceSensorNoEcho — reinitialising sensor",
+                    attempt, retries,
+                )
+                if not self._reinit_rcwl1655_gpio():
+                    log.error("RCWL-1655 GPIO reinit failed; giving up")
+                    return None
             except Exception as exc:  # noqa: BLE001
                 log.warning("RCWL-1655 GPIO read failed (attempt %d/%d): %s", attempt, retries, exc)
             if attempt < retries:
