@@ -954,6 +954,7 @@ async function refreshSensor() {
     tideChart.data.datasets[2].data = cachedSensorAll.filter(
       pt => pt.x >= xMin && pt.x <= xMax
     );
+    tideChart.options.plugins.tideAnnotations.nowMs = Date.now();
     tideChart.update('none');
   } catch (e) {
     console.warn('Sensor refresh failed:', e);
