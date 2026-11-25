@@ -372,14 +372,6 @@ function formatTick(ms, rangeMs) {
   return h < 12 ? `${h}am` : `${h - 12}pm`;
 }
 
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
-  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
-  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
-  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
-  ctx.closePath();
-}
 
 const annotationPlugin = {
   id: 'tideAnnotations',
@@ -416,47 +408,6 @@ const annotationPlugin = {
         }
         d.setDate(d.getDate() + 1);
       }
-    }
-
-    // Hi/Lo callouts — only when range ≤ 4 days
-    if (rangeMs <= 4 * 86400000) {
-      hilos.forEach(hl => {
-        const d  = parseLocalTime(hl.t);
-        const ms = d.getTime();
-        if (ms < scales.x.min || ms > scales.x.max) return;
-
-        const x      = scales.x.getPixelForValue(ms);
-        const y      = scales.y.getPixelForValue(parseFloat(hl.v));
-        const isHigh = hl.type === 'H';
-        const dot    = isHigh ? '#cc4400' : '#0055aa';
-
-        ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI*2);
-        ctx.fillStyle = dot; ctx.fill();
-        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
-
-        const timeStr = d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-        const htStr   = parseFloat(hl.v).toFixed(2) + "'";
-        const dayStr  = rangeMs > 86400000
-          ? d.toLocaleDateString('en-US', { weekday:'short' }) + ' ' : '';
-
-        const lineH = 13, boxW = 66, boxH = lineH*3+8, margin = 10;
-        const bx = Math.max(chartArea.left, Math.min(x - boxW/2, chartArea.right - boxW));
-        const by = isHigh ? y + margin : y - boxH - margin;
-
-        ctx.fillStyle = 'rgba(255,255,255,0.92)';
-        ctx.strokeStyle = dot; ctx.lineWidth = 1.2;
-        roundRect(ctx, bx, by, boxW, boxH, 3);
-        ctx.fill(); ctx.stroke();
-
-        const cx = bx + boxW / 2;
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 10px Arial'; ctx.fillStyle = dot;
-        ctx.fillText(isHigh ? 'High' : 'Low', cx, by + lineH);
-        ctx.font = '10px Arial'; ctx.fillStyle = '#222';
-        ctx.fillText(htStr, cx, by + lineH * 2);
-        ctx.font = '9px Arial'; ctx.fillStyle = '#666';
-        ctx.fillText(dayStr + timeStr, cx, by + lineH * 3 + 2);
-      });
     }
 
     // Threshold line
