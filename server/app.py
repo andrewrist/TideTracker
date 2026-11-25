@@ -235,6 +235,20 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.teardown_appcontext(close_db)
 
+    CORS_ORIGINS = {
+        "https://www.bigair.net",
+        "https://bigair.net",
+    }
+
+    @app.after_request
+    def _cors(response):
+        if request.path.startswith("/api/"):
+            origin = request.headers.get("Origin", "")
+            if origin in CORS_ORIGINS:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Vary"] = "Origin"
+        return response
+
     @app.route("/health")
     def health():
         return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}
