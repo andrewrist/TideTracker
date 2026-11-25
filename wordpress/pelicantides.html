@@ -441,7 +441,7 @@ const annotationPlugin = {
 
         const lineH = 13, boxW = 66, boxH = lineH*3+8, margin = 10;
         const bx = Math.max(chartArea.left, Math.min(x - boxW/2, chartArea.right - boxW));
-        const by = isHigh ? y - boxH - margin : y + margin;
+        const by = isHigh ? y + margin : y - boxH - margin;
 
         ctx.fillStyle = 'rgba(255,255,255,0.92)';
         ctx.strokeStyle = dot; ctx.lineWidth = 1.2;
